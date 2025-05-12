@@ -64,7 +64,6 @@ def submit_rating(user_id, movie_id, rating):
         existing = Rating.query.filter_by(user_id=user_id, movie_id=movie_id).first()
         if existing:
             existing.rating = rating
-            existing.timestamp = datetime.now()
         else:
             r = Rating(user_id=user_id, movie_id=movie_id, rating=rating)
             db.session.add(r)
