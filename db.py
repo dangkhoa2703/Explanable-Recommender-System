@@ -37,8 +37,6 @@ class Rating(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     movie_id = db.Column(db.Integer, db.ForeignKey("movie.id"), nullable=False)
     rating = db.Column(db.Float, nullable=False)
-    timestamp = db.Column(db.DateTime)
-    tags = db.Column(db.String)  # comma-separated tags
 
 with app.app_context():
     db.create_all()

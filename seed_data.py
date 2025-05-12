@@ -1,16 +1,12 @@
 import pandas as pd
 from db import db, app, User, Movie, Rating, Genre
-from datetime import datetime
-from collections import defaultdict
 from neo4j import GraphDatabase
-
-def convert_timestamp(ts):
-    return datetime.fromtimestamp(int(ts))
+import os
 
 # Neo4j connection setup
-NEO4J_URI = "bolt://localhost:7687"
-NEO4J_USER = "neo4j"
-NEO4J_PASSWORD = "12345678"
+NEO4J_URI = os.getenv("NEO4J_URI", "bolt://localhost:7687")
+NEO4J_USER = os.getenv("NEO4J_USER", "neo4j")
+NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD", "12345678")
 driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
 
 with app.app_context():
@@ -49,42 +45,35 @@ with app.app_context():
             id=int(row["movieId"]),
             title=row["title"],
             imdb_id=str(row["imdbId"]) if not pd.isna(row["imdbId"]) else None,
-            tmdb_id=str(row["tmdbId"]) if not pd.isna(row["tmdbId"]) else None,
-            genres=genre_objs
-        )
-        db.session.merge(movie)
+            tmdb_id=str(row["tmdbId"]) if not pd.isna(row["tmdbId"]) else None
+            )
+        db.session.add(movie)
+
+        # Safely assign genres now that movie is in the session
+        with db.session.no_autoflush:
+            movie.genres.extend(genre_objs)
+
     db.session.commit()
-
-    # Load tags and group by (userId, movieId)
-    tags_df = pd.read_csv("data/tags.csv")
-    tag_map = defaultdict(list)
-    for _, row in tags_df.iterrows():
-        uid, mid = int(row["userId"]), int(row["movieId"])
-        tag_map[(uid, mid)].append(row["tag"])
-
+    
     # Seed ratings with optional tags
     for _, row in ratings_df.iterrows():
         uid, mid = int(row["userId"]), int(row["movieId"])
-        tag_list = tag_map.get((uid, mid), [])
-        tags_str = ",".join(tag_list) if tag_list else None
 
         rating = Rating(
             user_id=uid,
             movie_id=mid,
-            rating=float(row["rating"]),
-            timestamp=convert_timestamp(row["timestamp"]),
-            tags=tags_str
+            rating=float(row["rating"])
         )
         db.session.add(rating)
     db.session.commit()
 
-    print("✅ Database seeded successfully.")
+    print("✅ Database seeded successfully.", flush=True)
     
     # 👉 Neo4j population
-    print("🌐 Populating Neo4j...")
+    print("🌐 Populating Neo4j...", flush=True)
     
     
-    print("🚀 Bulk inserting into Neo4j with CREATE...")
+    print("🚀 Bulk inserting into Neo4j with CREATE...", flush=True)
 
     with driver.session() as neo_session:
         # 1. Create Users
@@ -128,7 +117,7 @@ with app.app_context():
             """, user_id=rating.user_id, movie_id=rating.movie_id, score=rating.rating)
 
     driver.close()
-    print("✅ Fast Neo4j import complete.")
+    print("✅ Fast Neo4j import complete.", flush=True)
 
 
     
