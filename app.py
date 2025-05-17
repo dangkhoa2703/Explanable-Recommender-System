@@ -28,6 +28,8 @@ def login_user(username):
             db.session.add(user)
             db.session.commit()
             add_user(user.id, username)
+            if "need_retrain" in st.session_state:
+                st.session_state.need_retrain = True
         return user.id
 
 def fetch_selected_movies(limit=5):
@@ -69,6 +71,37 @@ def submit_rating(user_id, movie_id, rating):
             db.session.add(r)
         add_rating(user_id, movie_id, rating)
         db.session.commit()
+        if "need_retrain" in st.session_state:
+            st.session_state.need_retrain = True
+        
+def train_model():
+    with app.app_context():
+        ratings = Rating.query.all()
+        if not ratings:
+            return []
+        data = [(str(r.user_id), str(r.movie_id), r.rating) for r in ratings]
+        df = pd.DataFrame(data, columns=["userID", "itemID", "rating"])
+        reader = Reader(rating_scale=(1.0, 5.0))
+        trainset = Dataset.load_from_df(df, reader).build_full_trainset()
+        model = SVD()
+        model.fit(trainset)
+        return model
+    
+def  get_recommendations_with_trained_model(model, user_id, n=5):
+         with app.app_context():
+
+            all_movies = {str(m.id): m for m in Movie.query.all()}
+            rated = {str(r.movie_id) for r in Rating.query.filter_by(user_id=user_id).all()}
+            unseen = set(all_movies.keys()) - rated
+
+            predictions = [(mid, model.predict(str(user_id), mid).est) for mid in unseen]
+            # Filter for predictions with rating >= 4.0
+            high_rated = [(mid, score) for mid, score in predictions if score >= 4.0]
+
+            # Randomly select n from high-rated movies
+            top_n = random.sample(high_rated, min(n, len(high_rated)))
+
+            return [{"movie_title": all_movies[mid].title, "explanations": get_explanation(user_id,mid), "score": round(score,1)} for mid, score in top_n]
 
 def get_recommendations_with_explanation(user_id, n=5):
     try:
@@ -93,7 +126,7 @@ def get_recommendations_with_explanation(user_id, n=5):
             predictions = [(mid, model.predict(str(user_id), mid).est) for mid in unseen]
             top_n = sorted(predictions, key=lambda x: x[1], reverse=True)[:n]
 
-        return [{"movie_title": all_movies[mid].title, "explanations": get_explanation(user_id,mid)} for mid, score in top_n]
+        return [{"movie_title": all_movies[mid].title, "explanations": get_explanation(user_id,mid), "score": round(score,1)} for mid, score in top_n]
 
     except Exception as e:
 
@@ -103,7 +136,10 @@ def get_recommendations_with_explanation(user_id, n=5):
 # -----------------------
 # Streamlit Interface
 # -----------------------
-
+if "model" not in st.session_state:
+    st.session_state.model = train_model()
+if "need_retrain" not in st.session_state:
+    st.session_state.need_retrain = False
 # 1. User login
 username = st.text_input("Enter your username:")
 if st.button("Login") and username:
@@ -159,13 +195,15 @@ if "user_id" in st.session_state:
         
         if st.button("📌 Get Recommendations"):
             rated_movies_number = get_rated_movies_number()
-            recs = get_recommendations_with_explanation(st.session_state.user_id)
-            if rated_movies_number < 5 or recs is None:
+            if st.session_state.need_retrain:
+                st.session_state.model = train_model()
+                st.session_state.need_retrain = False
+            recs = get_recommendations_with_trained_model(st.session_state.model,st.session_state.user_id)
+            print(recs,flush=True)
+            if rated_movies_number == 0 or len(recs) == 0:
                 recs = popular_movie
             for r in recs:
                 st.markdown(f"**{r['movie_title']}**")
                 for explanation in r['explanations']:
                     st.caption(f"{explanation['type']}: {explanation['explanation']}")
-
-
 

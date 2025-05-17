@@ -19,7 +19,7 @@ def explain_by_genre(user_id, movie_id):
     """
     with driver.session() as session:
         result = session.run(query, user_id=int(user_id), movie_id=int(movie_id))
-        print(result)
+        # print(result)
         record = result.single()
         if record and record["top_genres"]:
             genre_list = record["top_genres"]
@@ -46,7 +46,7 @@ def explain_by_shared_genres(user_id, movie_id):
     with driver.session() as session:
         result = session.run(query, user_id=int(user_id), movie_id=int(movie_id))
         record = result.data()
-        print(record)
+        # print(record)
         if record:
             # return f"You might like this movie because it shares {record['shared_genre_count']} genres with '{record['rated_movie']}', which you watched."
             rated_movies = ','.join([r['rated_movie'] for r in record])
