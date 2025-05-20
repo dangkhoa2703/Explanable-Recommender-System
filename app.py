@@ -28,8 +28,6 @@ def login_user(username):
             db.session.add(user)
             db.session.commit()
             add_user(user.id, username)
-            if "need_retrain" in st.session_state:
-                st.session_state.need_retrain = True
         return user.id
 
 def fetch_selected_movies(limit=5):

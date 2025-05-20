@@ -77,20 +77,24 @@ def explain_by_similar_user(user_id, movie_id):
             )
         return None
 
+# remove line 87, 92 and 97 to return all the explanations
 def get_explanation(user_id, movie_id):
     explanations = []
     try:
         explanation = explain_by_similar_user(user_id, movie_id)
         if explanation:
             explanations.append({'type': 'User-Based Explantion', 'explanation': explanation})
+            return explanations
 
         explanation = explain_by_shared_genres(user_id, movie_id)
         if explanation:
             explanations.append({'type': 'Item-Based Explantion', 'explanation': explanation})
-
+            return explanations       
+            
         explanation = explain_by_genre(user_id, movie_id)
         if explanation:
             explanations.append({'type': 'Genre-Based Explantion', 'explanation': explanation})
+            return explanations
 
         if len(explanations) > 0:
             return explanations

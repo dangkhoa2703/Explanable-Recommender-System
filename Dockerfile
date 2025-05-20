@@ -10,8 +10,8 @@ COPY requirements.txt .
 # Install dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Then copy the rest of the app
-COPY . .
+# # Then copy the rest of the app
+# COPY . .
 
 # Expose Streamlit's default port
 EXPOSE 8501
